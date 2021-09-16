@@ -1,0 +1,23 @@
+(version 1)
+
+;; sandbox profile for ping ping6
+
+;; For explanation and usage see https://github.com/BrianSwift/macOSSandboxBuild
+
+(deny default)
+
+(allow file-read* process-exec 
+	(literal "/sbin/ping")
+	(literal "/sbin/ping6")
+)
+
+(allow network-outbound
+       (literal "/private/var/run/mDNSResponder")
+       (remote udp) ; ping
+)
+
+(allow network-inbound (local udp "*:*")) ; ping
+
+(allow file-read-metadata
+	(literal "/var") ; needed for DNS resolution
+)

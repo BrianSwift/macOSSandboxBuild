@@ -1,0 +1,5 @@
+(version 1)
+;; Profile that just blocks mach-lookup
+;; Only used while populating xcrun_db
+(allow default)
+(deny mach-lookup)

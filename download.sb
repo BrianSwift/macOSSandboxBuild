@@ -1,0 +1,51 @@
+(version 1)
+
+;; sandbox profile for downloading software using curl or git
+
+;; For explanation and usage see https://github.com/BrianSwift/macOSSandboxBuild
+
+(deny default)
+
+(allow process-fork) ;; git needs
+
+(allow file-read* process-exec 
+	(literal "/usr/bin/curl")
+	(literal "/Applications/Xcode.app/Contents/Developer/usr/bin/git")
+	(subpath "/Applications/Xcode.app/Contents/Developer/usr/libexec/git-core")
+	(subpath "/Applications/Xcode.app/Contents/Developer/usr/share/git-core")
+)
+
+(allow file-read* file-write-data
+	(literal "/dev/null") ;; git
+	(literal "/dev/zero"))
+
+(allow network-outbound
+       (literal "/private/var/run/mDNSResponder") ; name lookup
+       (remote tcp "*:443")
+)
+
+(allow file-read-metadata
+	(literal "/var") ; needed for DNS resolution
+	(subpath "/etc") ; needed for curl/git to traverse to /private/etc/ssl
+)
+
+(allow file-read*
+	(subpath "/private/etc/ssl") ; git/curl references to /etc/ssl/cert.pem
+)
+
+(allow file-read* file-write*
+	(subpath (param "_RW1")) ;; current and sub dirs
+)
+
+(allow file-read-metadata
+	(path-ancestors (param "_RW1")) ; git does file-read-metadata (stat?) on all path prefixes several times
+)
+
+(allow sysctl-read
+	(sysctl-name 
+		"kern.hostname" ; git produces error without hostname, but still runs to completion
+				; when checking out gflags, hostname becomes part of log messages in:
+					; .git/logs/HEAD gflags/.git/logs/HEAD
+					; .git/logs/refs/heads/master gflags/.git/logs/refs/heads/master
+					; .git/logs/refs/remotes/origin/HEAD gflags/.git/logs/refs/remotes/origin/HEAD
+))

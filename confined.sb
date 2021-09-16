@@ -1,0 +1,216 @@
+(version 1)
+
+;; sandbox profile for building software from command line
+
+;; For explanation and usage see https://github.com/BrianSwift/macOSSandboxBuild
+
+;; MIT License (at end)
+ 
+
+(deny default)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; process
+
+(allow process-fork) ;; Because building means running commands and scripts
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; file
+
+(allow file-read* file-write*
+	(subpath (param "_RW1")) ;; current and sub dirs
+	(subpath (param "_TMPDIR")) ;; TMPDIR and sub dirs (should already be setup with pre-heated xcrun_db)
+)
+
+(allow file-read* file-write-data
+	(literal "/dev/null")
+	(literal "/dev/zero"))
+
+(allow file-read* process-exec 
+	(subpath (param "_RX1")) ;; additional direcory read/execute directory
+	(subpath "/bin") ;; sh, bash
+	(subpath "/usr/bin") ;; uname (cmake), dirname
+	(subpath "/Applications/Xcode.app") ;; clang
+)
+
+;; Initial elements mentioned in blastdoor.sb
+;; Allow read access to standard system paths.
+(allow file-read*
+	(subpath "/System/Library") ;; Tightened, was "/System"
+	(subpath "/usr/lib")
+	(subpath "/usr/share")
+	;; Tighter. Removed  (subpath "/private/var/db/dyld")
+
+	;; my additions
+	(literal "/Library/Preferences/.GlobalPreferences.plist") ;; sw_vers xcodebuild
+	(literal "/Library/Preferences/com.apple.dt.Xcode.plist") ;; xcodebuild (checking last license agreed to "IDELastGMLicenseAgreedTo")
+
+	;; xcodebuild (though doesn't break without)
+	(literal "/System")
+	(literal "/usr")
+)
+
+;; Initially from blastdoor.sb
+(allow file-read-metadata
+	(path-ancestors (param "_RX1"))
+	(literal "/etc")
+	(literal "/tmp")
+	(literal "/var")
+	(literal "/private/etc/localtime")
+	;; sh wants
+	(literal "/private/var/select/sh")
+
+	;; clang wants to read metadata from from XCode parent dirs
+	(literal "/Applications")
+	(literal "/")
+)
+
+;; From blastdoor.sb 
+;; Allow access to standard special files.
+(allow file-read*
+	(literal "/dev/random")
+	(literal "/dev/urandom"))
+
+;; deny (with no-report) to reduce log pollution
+;; Idea is to reduce/eliminate logged messages for a nominal run,
+;; so any messages that are logged are significant.
+(deny file* (with no-report)
+	(literal "/dev") ;; bash
+	(literal "/dev/tty")   ;; bash
+	(literal "/Library/Preferences/Logging/com.apple.diagnosticd.filter.plist")
+	(literal "/usr/local")
+	(subpath "/private/var/db/timezone") ; xcodebuild, sw_vers, make
+	(literal "/private/etc/passwd") ;; clang, make, access probably for group number to name conversion, block doesn't cause failure but does pollute log file
+	(literal "/System/Volumes") ;; xcodebuild
+	(literal "/private/tmp") ;; cmake frequent file-read-metadata (possibly due to  ./kwsys/SystemTools.cxx:  SystemTools::AddKeepPath("/tmp/");)
+	(literal "/private") ;; cmake frequent file-read-metadata 
+)
+
+
+
+;; Everything accesses /AppleInternal. Blocking doesn't seem to hurt. Explicit block "(with no-report)" to prevent log pollution
+(deny file-read-metadata (with no-report) (literal "/AppleInternal"))
+
+
+;; Every launched process tries to access dtracehelper. Added (with no-report) to reduce log pollution.
+(deny (with no-report) file-read* file-write-data file-ioctl
+	 (literal "/dev/dtracehelper"))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; mach-lookup
+;;
+;; All are denied by (deny default). Reduce log pollution for these.
+
+;; reduce log pollution
+(deny mach-lookup (with no-report)
+	(global-name-prefix "com.apple.system.opendirectoryd.") ;; clang
+	(global-name-prefix "com.apple.logd") ;; make
+	(global-name "com.apple.bsd.dirhelper") ;; clang
+	(global-name "com.apple.system.notification_center") ;; xcodebuild, make, sw_vers
+	(global-name "com.apple.coresymbolicationd") ;; xcodebuild
+	(global-name "com.apple.CoreServices.coreservicesd") ;; xcodebuild
+	(global-name "com.apple.diagnosticd") ;; xcodebuild, make, sw_vers
+	(global-name "com.apple.lsd.mapdb") ;; xcodebuild
+	(global-name "com.apple.dt.CommandLineTools.installondemand") ;; gcc, clang
+)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; sysctl
+;;
+;; All denied by (deny default) at top.
+;;
+
+(deny sysctl* (with no-report) (sysctl-name
+	;; every executable startup does this, why
+	"kern.osvariant_status"
+	"hw.ephemeral_storage"
+)) 
+
+(allow sysctl-read
+	(sysctl-name 
+		;; uname ( used in cmake build)
+		"kern.ostype"
+		"kern.hostname"
+		"kern.osrelease"
+		"kern.version"
+		"hw.machine"
+
+		;;clang
+		"hw.pagesize_compat"
+		"kern.argmax"
+		;;ld 
+		"hw.ncpu"
+		;; bash, clang++, 
+		"kern.secure_kernel" ;; pollution doesn't break
+		;; xcodebuild
+		"kern.maxfilesperproc"
+		"kern.osproductversion"
+		;; bash and others
+		"kern.ngroups"
+	)
+) 
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; ipc
+
+(deny ipc-posix-shm-read-data (with no-report) (ipc-posix-name "apple.shm.notification_center")) ;; xcodebuild, sw_vers, make
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; network
+;;
+;; All network access is already denied by (deny default) at top.
+;; This is just reducing frequent log message
+
+(deny network-outbound (with no-report) (literal "/private/var/run/syslog")) ;; clang, make, test
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; syscall
+
+;; Stop xcodebuild from enumerating mounts on every invocation
+;;   syscall names in /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/sys/syscall.h
+
+(deny syscall-unix (with no-report)
+	(syscall-number SYS_getfsstat64)
+)
+;; would be nice to have more granularity, to be able to specify the "no-report" just for xcodebuild
+;;  so any other occurrences would be visible
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; system-privilege
+
+(deny system-privilege) ;; from blastdoor.sb, wasn't generating deny messaegs before added. Seeing deny(1) system-privilege 1002. Don't know if allowed even with (deny default), or by default denied (with no-report)
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; License
+
+;MIT License
+;
+;Copyright (c) 2021 Brian Swift
+;
+;Permission is hereby granted, free of charge, to any person obtaining a copy
+;of this software and associated documentation files (the "Software"), to deal
+;in the Software without restriction, including without limitation the rights
+;to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+;copies of the Software, and to permit persons to whom the Software is
+;furnished to do so, subject to the following conditions:
+;
+;The above copyright notice and this permission notice shall be included in all
+;copies or substantial portions of the Software.
+;
+;THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+;IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+;FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+;AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+;LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+;OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+;SOFTWARE.
