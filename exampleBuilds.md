@@ -214,9 +214,9 @@ cd "$HOME/Dev Space/Net/ceres/Src"
 git clone https://ceres-solver.googlesource.com/ceres-solver
 cd "$HOME/Dev Space/Net/ceres/Build"
 export CMAKE_PREFIX_PATH="$HOME/Dev Space/Net/eigen/Inst:$HOME/Dev Space/Net/glog/Inst:$HOME/Dev Space/Net/gflags/Inst"
-;: touch - because if the .git/hooks/commit-msg doesn't exist in the source, it will try to download and copy it there, which fails because *sandbox*
+;: touch - because if the .git/hooks/commit-msg does not exist in the source, it will try to download and copy it there, which fails because _sandbox_
 touch  "$HOME/Dev Space/Net/ceres/Src/ceres-solver/.git/hooks/commit-msg"
-/usr/bin/time sandbox-exec -D_RX1="$HOME/Dev Space/Net" -D_RW1="$PWD" -D_TMPDIR="$TMPDIR" -f "$HOME/Development/github/macOSSandboxBuild/confined.sb" cmake -S "$HOME/DevSpace/Net/ceres/Src/ceres-solver" -B . --install-prefix "$HOME/Dev Space/Net/ceres/Inst"
+/usr/bin/time sandbox-exec -D_RX1="$HOME/Dev Space/Net" -D_RW1="$PWD" -D_TMPDIR="$TMPDIR" -f "$HOME/Development/github/macOSSandboxBuild/confined.sb" cmake -S "$HOME/Dev Space/Net/ceres/Src/ceres-solver" -B . --install-prefix "$HOME/Dev Space/Net/ceres/Inst"
 ...
 -- Build files have been written to: /Users/sand/Dev Space/Net/ceres/Build
        16.87 real         6.54 user         5.48 sys
