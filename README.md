@@ -72,7 +72,7 @@ mkdir -p "$HOME/Dev Space/Net/cmake/"{Src,Build,Dist,Inst}
 Download `cmake` source distribution (using "download.sb" sandbox)
 ```
 cd "$HOME/Dev Space/Net/cmake/Dist"
-sandbox-exec -D_RW1="$PWD" -f /Users/bswift/Development/github/macOSSandboxBuild/download.sb curl -OL https://github.com/Kitware/CMake/releases/download/v3.21.2/cmake-3.21.2.tar.gz
+sandbox-exec -D_RW1="$PWD" -f "$HOME/Development/github/macOSSandboxBuild/download.sb" curl -OL https://github.com/Kitware/CMake/releases/download/v3.21.2/cmake-3.21.2.tar.gz
 ```
 Unpack source within confined sandbox
 ```
