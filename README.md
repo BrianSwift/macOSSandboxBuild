@@ -53,9 +53,9 @@ First pass takes a few seconds per tool, and may get error messages when looking
 ```
 Verify `xcrun_db` has been created in `$TMPDIR`.
 ```
-ls -l "$TMPDIR"
-total 64
--rw-------  1 sand  notstaff  31950 Sep  9 21:46 xcrun_db
+ls -l "$TMPDIR/xcrun_db"
+: total 64
+: -rw-------  1 sand  notstaff  31950 Sep  9 21:46 xcrun_db
 ```
 `xcrun_db` is pre-loaded because `xcodebuild` (which is invoked by shim apps in `/usr/bin` does not like trying to determine the developer tools configuration while running in a confined sandbox. After producing `xcrun_db`, `xcodebuild` will be able to lookup paths to real tools whenever a shim is invoked rather than performing a search.
 
